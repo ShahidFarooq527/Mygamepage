@@ -5,35 +5,34 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Wingo Admin Panel</title>
 <style>
-body { font-family: Arial; background:#f0f2f5; text-align:center; margin:0; padding:0; }
+body { font-family: Arial; background:#eef3ff; text-align:center; margin:0; padding:0; }
 .container { max-width:900px; margin:auto; padding:20px; }
-h2 { color:#0d47a1; font-size:36px; }
-input, button { padding:10px 14px; margin:5px; border-radius:8px; font-size:14px; }
+h2 { color:#0d47a1; font-size:32px;}
+input, button, select { padding:8px 12px; margin:5px; border-radius:6px; font-size:14px; }
 button { cursor:pointer; transition:0.3s; }
-button:hover:not(:disabled){transform:scale(1.05);}
-button:disabled{background:#ccc; cursor:not-allowed;}
+button:hover{ transform:scale(1.05); }
 .tableContainer { max-height:400px; overflow-y:auto; border:1px solid #ccc; margin-top:15px; }
-table { width:100%; border-collapse:separate; table-layout:fixed; word-wrap:break-word; font-size:12px; }
-th, td { border:1px solid #ddd; padding:6px; text-align:center; white-space:normal; overflow-wrap:break-word; border-radius:6px; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th, td { border:1px solid #ddd; padding:6px; text-align:center; }
 th { background:#1976d2; color:white; position:sticky; top:0; z-index:2; }
 </style>
 </head>
 <body>
-<div class="container">
-<h2>Admin Panel - Wingo Game</h2>
-<div id="loginDiv">
-<input id="username" placeholder="Username"><br>
-<input id="password" type="password" placeholder="Password"><br>
-<button onclick="login()">Login</button>
+
+<div class="container" id="loginDiv">
+<h2>Admin Login</h2>
+<input type="text" id="adminUser" placeholder="Username"><br>
+<input type="password" id="adminPass" placeholder="Password"><br>
+<button onclick="loginAdmin()">Login</button>
 </div>
 
-<div id="panelDiv" style="display:none;">
-<h3>Deposit & Withdraw Requests</h3>
+<div class="container" id="adminDiv" style="display:none;">
+<h2>Admin Panel</h2>
+<h3>Pending Deposit & Withdraw Requests</h3>
 <div class="tableContainer">
-<table id="requestTable">
-<tr><th>User ID</th><th>Name</th><th>Method</th><th>Account</th><th>Amount</th><th>Type</th><th>Status</th><th>Reason</th><th>Action</th></tr>
+<table id="requestsTable">
+<tr><th>User ID</th><th>Name</th><th>Method</th><th>Account</th><th>Transaction</th><th>Type</th><th>Amount</th><th>Date</th><th>Status</th><th>Reason</th><th>Action</th></tr>
 </table>
-</div>
 </div>
 </div>
 
@@ -54,79 +53,85 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ===== Security Login =====
-const adminUser = "Admin";
-const adminPass = "1234";
-function login(){
-    const u = document.getElementById("username").value;
-    const p = document.getElementById("password").value;
-    if(u===adminUser && p===adminPass){
+// ===== Admin Login =====
+const ADMIN_USERNAME = "Admin"; // set your admin username
+const ADMIN_PASSWORD = "1234"; // set your admin password
+
+function loginAdmin(){
+    const user = document.getElementById("adminUser").value;
+    const pass = document.getElementById("adminPass").value;
+
+    if(user===ADMIN_USERNAME && pass===ADMIN_PASSWORD){
+        alert("✅ Login Successful!");
         document.getElementById("loginDiv").style.display="none";
-        document.getElementById("panelDiv").style.display="block";
+        document.getElementById("adminDiv").style.display="block";
         loadRequests();
-    } else alert("Invalid credentials!");
+    } else {
+        alert("❌ Wrong username or password!");
+    }
 }
 
 // ===== Load Requests =====
 function loadRequests(){
-    const t = document.getElementById("requestTable");
-    db.ref('requests').on('value',snap=>{
-        t.innerHTML="<tr><th>User ID</th><th>Name</th><th>Method</th><th>Account</th><th>Amount</th><th>Type</th><th>Status</th><th>Reason</th><th>Action</th></tr>";
+    const t = document.getElementById("requestsTable");
+    t.innerHTML="<tr><th>User ID</th><th>Name</th><th>Method</th><th>Account</th><th>Transaction</th><th>Type</th><th>Amount</th><th>Date</th><th>Status</th><th>Reason</th><th>Action</th></tr>";
+
+    db.ref('requests').on('value', snap=>{
+        t.innerHTML="<tr><th>User ID</th><th>Name</th><th>Method</th><th>Account</th><th>Transaction</th><th>Type</th><th>Amount</th><th>Date</th><th>Status</th><th>Reason</th><th>Action</th></tr>";
         snap.forEach(s=>{
             const r = s.val();
             const key = s.key;
-            let actionBtn = '';
-            if(r.status==='pending'){
-                actionBtn = `<button onclick="approve('${key}', '${r.user}', ${r.amount}, '${r.type}')">Approve</button>
-                             <button onclick="reject('${key}')">Reject</button>`;
+            const status = r.status || "pending";
+            const reason = r.reason || "";
+
+            let actionBtns = "";
+            if(status==="pending"){
+                actionBtns = `<button onclick="approve('${key}')">Approve</button> 
+                              <button onclick="reject('${key}')">Reject</button>`;
             }
+
             t.innerHTML += `<tr>
-                <td>${r.user}</td><td>${r.name}</td><td>${r.method}</td>
-                <td>${r.account}</td><td>${r.amount}</td><td>${r.type}</td>
-                <td>${r.status}</td><td>${r.reason||''}</td>
-                <td>${actionBtn}</td>
+                <td>${r.user}</td>
+                <td>${r.name}</td>
+                <td>${r.method}</td>
+                <td>${r.account}</td>
+                <td>${r.trx||''}</td>
+                <td>${r.type}</td>
+                <td>${r.amount}</td>
+                <td>${r.date}</td>
+                <td>${status}</td>
+                <td>${reason}</td>
+                <td>${actionBtns}</td>
             </tr>`;
         });
     });
 }
 
 // ===== Approve / Reject =====
-function approve(key, uid, amt, type){
-    if(type==='deposit'){
-        db.ref('users/'+uid+'/balance').once('value').then(s=>{
-            const bal = s.val()||0;
-            db.ref('users/'+uid+'/balance').set(bal+amt);
-        });
-    }
-    db.ref('requests/'+key).update({status:'approved', reason:''});
-    db.ref('users/'+uid+'/dailyHistory').once('value').then(snap=>{
-        snap.forEach(s=>{
-            const h = s.val();
-            if(h.deposit===amt && h.status==='pending'){
-                db.ref('users/'+uid+'/dailyHistory/'+s.key).update({status:'approved', reason:''});
-            }
-        });
+function approve(key){
+    db.ref('requests/'+key).once('value').then(s=>{
+        const r = s.val();
+        if(!r) return;
+        db.ref('requests/'+key).update({status:'approved', reason:'Approved by admin'});
+        alert("✅ Request Approved!");
+        // Optionally add balance for deposit
+        if(r.type==='deposit'){
+            db.ref('users/'+r.user+'/balance').once('value').then(snap=>{
+                let b = snap.val()||0;
+                b += r.amount;
+                db.ref('users/'+r.user+'/balance').set(b);
+            });
+        }
     });
 }
 
 function reject(key){
-    const reason = prompt("Reason for rejection:");
+    const reason = prompt("Enter reason for rejection");
     if(!reason) return alert("Reason required!");
-    const r = db.ref('requests/'+key);
-    r.once('value').then(snap=>{
-        const data = snap.val();
-        const uid = data.user;
-        r.update({status:'rejected', reason:reason});
-        db.ref('users/'+uid+'/dailyHistory').once('value').then(ds=>{
-            ds.forEach(s=>{
-                const h = s.val();
-                if((h.deposit===data.amount || h.withdraw===data.amount) && h.status==='pending'){
-                    db.ref('users/'+uid+'/dailyHistory/'+s.key).update({status:'rejected', reason:reason});
-                }
-            });
-        });
-    });
+    db.ref('requests/'+key).update({status:'rejected', reason:reason});
+    alert("❌ Request Rejected!");
 }
+
 </script>
 </body>
 </html>

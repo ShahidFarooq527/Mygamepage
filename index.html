@@ -114,7 +114,7 @@ function approve(key){
         if(!r) return;
 
         // ===== Update Request Status =====
-        db.ref('requests/'+key).update({status:'approved', reason:'Approved by admin'});
+        db.ref('requests/'+key).update({status:'approved', reason:'NO REASON'});
 
         // ===== Update User Balance & Daily History =====
         db.ref('users/'+r.user).once('value').then(uSnap=>{

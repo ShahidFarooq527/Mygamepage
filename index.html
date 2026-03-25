@@ -112,26 +112,60 @@ function approve(key){
     db.ref('requests/'+key).once('value').then(s=>{
         const r = s.val();
         if(!r) return;
+
+        // ===== Update Request Status =====
         db.ref('requests/'+key).update({status:'approved', reason:'Approved by admin'});
+
+        // ===== Update User Balance & Daily History =====
+        db.ref('users/'+r.user).once('value').then(uSnap=>{
+            const userData = uSnap.val() || {};
+            let newBalance = userData.balance || 0;
+            if(r.type==='deposit'){
+                newBalance += r.amount;
+            }
+            db.ref('users/'+r.user+'/balance').set(newBalance);
+
+            // Push to dailyHistory
+            const historyEntry = {
+                date: r.date,
+                deposit: r.type==='deposit'? r.amount : 0,
+                withdraw: r.type==='withdraw'? r.amount : 0,
+                status: 'approved',
+                reason: 'Approved by admin'
+            };
+            db.ref('users/'+r.user+'/dailyHistory').push(historyEntry);
+        });
+
         alert("✅ Request Approved!");
-        // Optionally add balance for deposit
-        if(r.type==='deposit'){
-            db.ref('users/'+r.user+'/balance').once('value').then(snap=>{
-                let b = snap.val()||0;
-                b += r.amount;
-                db.ref('users/'+r.user+'/balance').set(b);
-            });
-        }
     });
 }
 
 function reject(key){
     const reason = prompt("Enter reason for rejection");
     if(!reason) return alert("Reason required!");
-    db.ref('requests/'+key).update({status:'rejected', reason:reason});
-    alert("❌ Request Rejected!");
-}
 
+    db.ref('requests/'+key).once('value').then(s=>{
+        const r = s.val();
+        if(!r) return;
+
+        db.ref('requests/'+key).update({status:'rejected', reason:reason});
+
+        // Update dailyHistory for user
+        db.ref('users/'+r.user).once('value').then(uSnap=>{
+            const userData = uSnap.val() || {};
+            const historyEntry = {
+                date: r.date,
+                deposit: r.type==='deposit'? r.amount : 0,
+                withdraw: r.type==='withdraw'? r.amount : 0,
+                status: 'rejected',
+                reason: reason
+            };
+            db.ref('users/'+r.user+'/dailyHistory').push(historyEntry);
+        });
+
+        alert("❌ Request Rejected!");
+    });
+}
 </script>
 </body>
 </html>

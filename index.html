@@ -131,7 +131,7 @@ function approve(key){
                 deposit: r.type==='deposit'? r.amount : 0,
                 withdraw: r.type==='withdraw'? r.amount : 0,
                 status: 'approved',
-                reason: 'Approved by admin'
+                reason: 'NO REASON'
             };
             db.ref('users/'+r.user+'/dailyHistory').push(historyEntry);
         });

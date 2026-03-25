@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wingo Admin Panel</title>
+<style>
+body { font-family: Arial; background:#f0f2f5; text-align:center; margin:0; padding:0; }
+.container { max-width:900px; margin:auto; padding:20px; }
+h2 { color:#0d47a1; font-size:36px; }
+input, button { padding:10px 14px; margin:5px; border-radius:8px; font-size:14px; }
+button { cursor:pointer; transition:0.3s; }
+button:hover:not(:disabled){transform:scale(1.05);}
+button:disabled{background:#ccc; cursor:not-allowed;}
+.tableContainer { max-height:400px; overflow-y:auto; border:1px solid #ccc; margin-top:15px; }
+table { width:100%; border-collapse:separate; table-layout:fixed; word-wrap:break-word; font-size:12px; }
+th, td { border:1px solid #ddd; padding:6px; text-align:center; white-space:normal; overflow-wrap:break-word; border-radius:6px; }
+th { background:#1976d2; color:white; position:sticky; top:0; z-index:2; }
+</style>
+</head>
+<body>
+<div class="container">
+<h2>Admin Panel - Wingo Game</h2>
+<div id="loginDiv">
+<input id="username" placeholder="Username"><br>
+<input id="password" type="password" placeholder="Password"><br>
+<button onclick="login()">Login</button>
+</div>
+
+<div id="panelDiv" style="display:none;">
+<h3>Deposit & Withdraw Requests</h3>
+<div class="tableContainer">
+<table id="requestTable">
+<tr><th>User ID</th><th>Name</th><th>Method</th><th>Account</th><th>Amount</th><th>Type</th><th>Status</th><th>Reason</th><th>Action</th></tr>
+</table>
+</div>
+</div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<script>
+// ===== Firebase Config =====
+const firebaseConfig = {
+  apiKey: "AIzaSyA5CeMKIv2ss5O2ha7TuWEZUM9rL3mA1CY",
+  authDomain: "singo-274c9.firebaseapp.com",
+  databaseURL: "https://singo-274c9-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "singo-274c9",
+  storageBucket: "singo-274c9.appspot.com",
+  messagingSenderId: "350557755356",
+  appId: "1:350557755356:web:49bab09aee8aa53d84a119"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ===== Security Login =====
+const adminUser = "Admin";
+const adminPass = "1234";
+function login(){
+    const u = document.getElementById("username").value;
+    const p = document.getElementById("password").value;
+    if(u===adminUser && p===adminPass){
+        document.getElementById("loginDiv").style.display="none";
+        document.getElementById("panelDiv").style.display="block";
+        loadRequests();
+    } else alert("Invalid credentials!");
+}
+
+// ===== Load Requests =====
+function loadRequests(){
+    const t = document.getElementById("requestTable");
+    db.ref('requests').on('value',snap=>{
+        t.innerHTML="<tr><th>User ID</th><th>Name</th><th>Method</th><th>Account</th><th>Amount</th><th>Type</th><th>Status</th><th>Reason</th><th>Action</th></tr>";
+        snap.forEach(s=>{
+            const r = s.val();
+            const key = s.key;
+            let actionBtn = '';
+            if(r.status==='pending'){
+                actionBtn = `<button onclick="approve('${key}', '${r.user}', ${r.amount}, '${r.type}')">Approve</button>
+                             <button onclick="reject('${key}')">Reject</button>`;
+            }
+            t.innerHTML += `<tr>
+                <td>${r.user}</td><td>${r.name}</td><td>${r.method}</td>
+                <td>${r.account}</td><td>${r.amount}</td><td>${r.type}</td>
+                <td>${r.status}</td><td>${r.reason||''}</td>
+                <td>${actionBtn}</td>
+            </tr>`;
+        });
+    });
+}
+
+// ===== Approve / Reject =====
+function approve(key, uid, amt, type){
+    if(type==='deposit'){
+        db.ref('users/'+uid+'/balance').once('value').then(s=>{
+            const bal = s.val()||0;
+            db.ref('users/'+uid+'/balance').set(bal+amt);
+        });
+    }
+    db.ref('requests/'+key).update({status:'approved', reason:''});
+    db.ref('users/'+uid+'/dailyHistory').once('value').then(snap=>{
+        snap.forEach(s=>{
+            const h = s.val();
+            if(h.deposit===amt && h.status==='pending'){
+                db.ref('users/'+uid+'/dailyHistory/'+s.key).update({status:'approved', reason:''});
+            }
+        });
+    });
+}
+
+function reject(key){
+    const reason = prompt("Reason for rejection:");
+    if(!reason) return alert("Reason required!");
+    const r = db.ref('requests/'+key);
+    r.once('value').then(snap=>{
+        const data = snap.val();
+        const uid = data.user;
+        r.update({status:'rejected', reason:reason});
+        db.ref('users/'+uid+'/dailyHistory').once('value').then(ds=>{
+            ds.forEach(s=>{
+                const h = s.val();
+                if((h.deposit===data.amount || h.withdraw===data.amount) && h.status==='pending'){
+                    db.ref('users/'+uid+'/dailyHistory/'+s.key).update({status:'rejected', reason:reason});
+                }
+            });
+        });
+    });
+}
+</script>
+</body>
+</html>
